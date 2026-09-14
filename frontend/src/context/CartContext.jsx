@@ -254,6 +254,8 @@ export function CartProvider({ children }) {
         0
     );
 
+
+    // semoga aku bisa sukses
     return (
         <CartContext.Provider
             value={{
