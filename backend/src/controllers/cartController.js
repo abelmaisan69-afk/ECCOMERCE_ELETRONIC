@@ -29,7 +29,7 @@ const getCart = async (req, res) => {
         const [items] = await db.query(
             `
             SELECT
-                cart_items.id,
+                 cart_items.product_id AS id,
                 cart_items.product_id,
                 cart_items.quantity,
                 cart_items.price,
@@ -179,7 +179,119 @@ const addToCart = async (req, res) => {
     }
 };
 
+const updateCartItem = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { productId } = req.params;
+        const { quantity } = req.body;
+
+        const newQuantity = Number(quantity);
+
+        if (!Number.isInteger(newQuantity) || newQuantity < 1) {
+            return res.status(400).json({
+                message: "Quantity tidak valid",
+            });
+        }
+
+        const [items] = await db.query(
+            `
+            SELECT
+                cart_items.id,
+                products.stock
+            FROM cart_items
+            JOIN carts
+                ON cart_items.cart_id = carts.id
+            JOIN products
+                ON cart_items.product_id = products.id
+            WHERE carts.user_id = ?
+            AND cart_items.product_id = ?
+            `,
+            [userId, productId]
+        );
+
+        if (items.length === 0) {
+            return res.status(404).json({
+                message: "Produk tidak ada di keranjang",
+            });
+        }
+
+        const item = items[0];
+
+        if (newQuantity > item.stock) {
+            return res.status(400).json({
+                message: "Quantity melebihi stok produk",
+            });
+        }
+
+        await db.query(
+            `
+            UPDATE cart_items
+            JOIN carts
+                ON cart_items.cart_id = carts.id
+            SET cart_items.quantity = ?
+            WHERE carts.user_id = ?
+            AND cart_items.product_id = ?
+            `,
+            [
+                newQuantity,
+                userId,
+                productId,
+            ]
+        );
+
+        res.json({
+            message: "Quantity berhasil diperbarui",
+        });
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            message: "Gagal memperbarui quantity",
+        });
+    }
+};
+
+const removeFromCart = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { productId } = req.params;
+
+        const [result] = await db.query(
+            `
+            DELETE cart_items
+            FROM cart_items
+            JOIN carts
+                ON cart_items.cart_id = carts.id
+            WHERE carts.user_id = ?
+            AND cart_items.product_id = ?
+            `,
+            [
+                userId,
+                productId,
+            ]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: "Produk tidak ada di keranjang",
+            });
+        }
+
+        res.json({
+            message: "Produk berhasil dihapus dari keranjang",
+        });
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).json({
+            message: "Gagal menghapus produk",
+        });
+    }
+};
+
 module.exports = {
     getCart,
     addToCart,
+    updateCartItem,
+    removeFromCart,
 };

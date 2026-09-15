@@ -23,7 +23,10 @@ export function CartProvider({ children }) {
 
     const [loadingCart, setLoadingCart] = useState(false);
 
-    // Simpan cart lokal kalau user belum login
+    // ==================================================
+    // SIMPAN CART LOCAL
+    // ==================================================
+
     useEffect(() => {
         if (!isLoggedIn) {
             localStorage.setItem(
@@ -33,7 +36,10 @@ export function CartProvider({ children }) {
         }
     }, [cart, isLoggedIn]);
 
-    // Ambil cart dari database
+    // ==================================================
+    // AMBIL CART DARI DATABASE
+    // ==================================================
+
     const getCartFromDatabase = async () => {
         try {
             const token = localStorage.getItem("token");
@@ -57,7 +63,10 @@ export function CartProvider({ children }) {
         }
     };
 
-    // Sinkronisasi cart localStorage ke database
+    // ==================================================
+    // SINKRONISASI CART LOCAL KE DATABASE
+    // ==================================================
+
     const syncLocalCart = async () => {
         const savedCart = localStorage.getItem("cart");
 
@@ -102,7 +111,10 @@ export function CartProvider({ children }) {
         localStorage.removeItem("cart");
     };
 
-    // Ketika user login
+    // ==================================================
+    // KETIKA USER LOGIN
+    // ==================================================
+
     useEffect(() => {
         if (!isLoggedIn || !user) {
             return;
@@ -122,8 +134,12 @@ export function CartProvider({ children }) {
         loadCart();
     }, [isLoggedIn, user]);
 
+    // ==================================================
+    // TAMBAH KE CART
+    // ==================================================
+
     const addToCart = async (product) => {
-        // Kalau belum login → localStorage
+        // BELUM LOGIN
         if (!isLoggedIn) {
             setCart((currentCart) => {
                 const existingProduct =
@@ -156,7 +172,7 @@ export function CartProvider({ children }) {
             return;
         }
 
-        // Kalau sudah login → database
+        // SUDAH LOGIN
         try {
             const token =
                 localStorage.getItem("token");
@@ -185,7 +201,12 @@ export function CartProvider({ children }) {
         }
     };
 
+    // ==================================================
+    // HAPUS DARI CART
+    // ==================================================
+
     const removeFromCart = async (productId) => {
+        // BELUM LOGIN
         if (!isLoggedIn) {
             setCart((currentCart) =>
                 currentCart.filter(
@@ -196,23 +217,47 @@ export function CartProvider({ children }) {
             return;
         }
 
-        // Untuk sementara kita hapus langsung nanti
-        // endpoint DELETE akan kita buat setelah ini.
-        console.log(
-            "Hapus produk dari database:",
-            productId
-        );
+        // SUDAH LOGIN
+        try {
+            const token =
+                localStorage.getItem("token");
+
+            await api.delete(
+                `/cart/${productId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            await getCartFromDatabase();
+        } catch (error) {
+            console.error(error);
+
+            alert(
+                error.response?.data?.message ||
+                    "Gagal menghapus produk"
+            );
+        }
     };
+
+    // ==================================================
+    // UPDATE QUANTITY
+    // ==================================================
 
     const updateQuantity = async (
         productId,
         quantity
     ) => {
+        // Kalau quantity kurang dari 1
+        // maka produk dihapus
         if (quantity < 1) {
             await removeFromCart(productId);
             return;
         }
 
+        // BELUM LOGIN
         if (!isLoggedIn) {
             setCart((currentCart) =>
                 currentCart.map((item) =>
@@ -228,23 +273,56 @@ export function CartProvider({ children }) {
             return;
         }
 
-        console.log(
-            "Update quantity database:",
-            productId,
-            quantity
-        );
+        // SUDAH LOGIN
+        try {
+            const token =
+                localStorage.getItem("token");
+
+            await api.put(
+                `/cart/${productId}`,
+                {
+                    quantity,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            await getCartFromDatabase();
+        } catch (error) {
+            console.error(error);
+
+            alert(
+                error.response?.data?.message ||
+                    "Gagal mengubah quantity"
+            );
+        }
     };
+
+    // ==================================================
+    // KOSONGKAN CART
+    // ==================================================
 
     const clearCart = () => {
         setCart([]);
         localStorage.removeItem("cart");
     };
 
+    // ==================================================
+    // TOTAL ITEM
+    // ==================================================
+
     const totalItems = cart.reduce(
         (total, item) =>
             total + Number(item.quantity),
         0
     );
+
+    // ==================================================
+    // TOTAL HARGA
+    // ==================================================
 
     const totalPrice = cart.reduce(
         (total, item) =>
@@ -254,8 +332,10 @@ export function CartProvider({ children }) {
         0
     );
 
+    // ==================================================
+    // PROVIDER
+    // ==================================================
 
-    // semoga aku bisa sukses
     return (
         <CartContext.Provider
             value={{
